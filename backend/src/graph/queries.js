@@ -58,9 +58,12 @@ export async function getDecisionImpactTrace(decisionId) {
 export async function explainConnectionPath(startId, endId) {
   const graph = await getGraph();
   const cypher = `
-    MATCH p = shortestPath((a {id: $startId})-[*..5]-(b {id: $endId}))
-    RETURN [n in nodes(p) | {id: coalesce(n.id, n.path, n.name), label: labels(n)[0], title: coalesce(n.title, n.name, n.path)}] AS nodes,
-           [r in relationships(p) | type(r)] AS relationships
+    MATCH (a), (b)
+    WHERE (a.id = $startId OR a.path = $startId) AND (b.id = $endId OR b.path = $endId)
+    MATCH p = (a)-[r*1..3]-(b)
+    RETURN [n IN nodes(p) | coalesce(n.name, n.title, n.path)] AS pathNodes,
+           [rel IN relationships(p) | type(rel)] AS relationships
+    LIMIT 1
   `;
   const result = await graph.query(cypher, { params: { startId, endId } });
   return result.data;
@@ -139,4 +142,62 @@ export async function getGraphVisualizationData(limit = 100) {
   `;
   const result = await graph.query(cypher);
   return result.data;
+}
+
+/**
+ * Track 02: Retrieve Agent Shared State and Handoffs.
+ */
+export async function getAgentHandoffs() {
+  const graph = await getGraph();
+  const cypher = `
+    MATCH (a1:Agent)-[h:HANDED_OFF_TO]->(a2:Agent)
+    RETURN a1.name AS fromAgent,
+           a2.name AS toAgent,
+           h.task AS task,
+           h.status AS status,
+           h.handoffTime AS handoffTime
+  `;
+  const result = await graph.query(cypher);
+  return result.data;
+}
+
+/**
+ * Track 03: Company Brain - Code Ownership and Domain Experts.
+ */
+export async function getCompanyOwnershipAndExperts() {
+  const graph = await getGraph();
+  const cypher = `
+    MATCH (u:User)-[:OWNS]->(f:SourceFile)
+    OPTIONAL MATCH (expert:User)-[:EXPERT_IN]->(c:Concept)
+    RETURN collect(DISTINCT {owner: u.name, role: u.role, file: f.path}) AS fileOwnership,
+           collect(DISTINCT {expert: expert.name, concept: c.name}) AS domainExperts
+  `;
+  const result = await graph.query(cypher);
+  return result.data[0] || { fileOwnership: [], domainExperts: [] };
+}
+
+/**
+ * Track 03: Decision Lineage & Provenance.
+ */
+export async function getDecisionLineage(decisionId = 'adr_001') {
+  const graph = await getGraph();
+  const cypher = `
+    MATCH (d:Decision {id: $decisionId})
+    OPTIONAL MATCH (d)-[:RESOLVES_TICKET]->(t:Ticket)
+    OPTIONAL MATCH (d)-[:CITES_DOCUMENT]->(doc:Document)
+    OPTIONAL MATCH (u:User)-[:AUTHORED]->(d)
+    OPTIONAL MATCH (u_rev:User)-[:REVIEWED]->(d)
+    RETURN d.title AS title,
+           d.decision AS decision,
+           d.rationale AS rationale,
+           u.name AS author,
+           u_rev.name AS reviewer,
+           t.id AS ticketId,
+           t.title AS ticketTitle,
+           t.status AS ticketStatus,
+           doc.title AS docTitle,
+           doc.url AS docUrl
+  `;
+  const result = await graph.query(cypher, { params: { decisionId } });
+  return result.data[0] || null;
 }

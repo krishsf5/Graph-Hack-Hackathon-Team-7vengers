@@ -47,10 +47,11 @@ export async function ingestCodebase(directoryPath) {
     // 1. Create SourceFile node
     const fileCypher = `
       MERGE (f:SourceFile {path: $path})
-      SET f.language = $lang, f.updatedAt = datetime()
+      SET f.language = $lang, f.updatedAt = $updatedAt
     `;
     const lang = path.extname(filePath).replace('.', '') || 'js';
-    await graph.query(fileCypher, { params: { path: relativePath, lang } });
+    const updatedAt = new Date().toISOString();
+    await graph.query(fileCypher, { params: { path: relativePath, lang, updatedAt } });
     ingestedFiles++;
 
     // 2. Parse AST

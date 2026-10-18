@@ -1,5 +1,57 @@
 import React, { useState } from 'react';
 
+function formatInline(str) {
+  if (!str) return '';
+  const parts = str.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i} style={{ color: '#fff', fontWeight: 600 }}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith('`') && part.endsWith('`')) {
+      return <code key={i} className="inline-code">{part.slice(1, -1)}</code>;
+    }
+    return part;
+  });
+}
+
+function FormattedContent({ text }) {
+  if (!text) return null;
+  const lines = text.split('\n');
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+      {lines.map((line, idx) => {
+        const trimmed = line.trim();
+        if (!trimmed) return null;
+
+        if (trimmed.startsWith('### ')) {
+          return <div key={idx} className="agent-h3">{trimmed.replace('### ', '')}</div>;
+        }
+        if (trimmed.startsWith('#### ')) {
+          return <div key={idx} className="agent-h4">{trimmed.replace('#### ', '')}</div>;
+        }
+        if (trimmed.startsWith('> ')) {
+          return <blockquote key={idx} className="agent-quote">{formatInline(trimmed.replace('> ', ''))}</blockquote>;
+        }
+        if (trimmed.startsWith('- ')) {
+          const isIndented = line.startsWith('  ');
+          return (
+            <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginLeft: isIndented ? '1.25rem' : '0.25rem' }}>
+              <span style={{ color: 'var(--accent-falkor)', fontSize: '0.85rem', lineHeight: 1.6 }}>•</span>
+              <span className="agent-bullet">{formatInline(trimmed.replace('- ', ''))}</span>
+            </div>
+          );
+        }
+        if (trimmed.startsWith('*') && trimmed.endsWith('*') && trimmed.length > 2) {
+          return <div key={idx} className="agent-note">{trimmed.slice(1, -1)}</div>;
+        }
+
+        return <div key={idx} style={{ lineHeight: 1.6, fontSize: '0.92rem' }}>{formatInline(line)}</div>;
+      })}
+    </div>
+  );
+}
+
 export default function AgentChat() {
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
@@ -13,10 +65,12 @@ export default function AgentChat() {
   ]);
 
   const sampleQueries = [
-    'What files and symbols are impacted by ADR-001?',
-    'Why must JWT tokens store userCode instead of role strings?',
-    'What did Krish and Sarah agree upon in Session #101?',
-    'Explain the connection between Krish and token.util.js'
+    { track: 'Track 01: Connected Data', q: 'What files and symbols are impacted by ADR-001?' },
+    { track: 'Track 01: Reasoning Path', q: 'Explain the connection between Krish and token.util.js' },
+    { track: 'Track 02: Coordination', q: 'Show shared handoffs and state between Architect Agent and Security Agent' },
+    { track: 'Track 02: Episodic Memory', q: 'What did Krish and Sarah agree upon in Session #101?' },
+    { track: 'Track 03: Company Brain', q: 'Who owns auth.service.js and who is expert in Security?' },
+    { track: 'Track 03: Provenance', q: 'Trace the source origin and ticket for ADR-001' }
   ];
 
   async function handleSend(promptText = question) {
@@ -38,7 +92,7 @@ export default function AgentChat() {
 
       const agentMsg = {
         role: 'agent',
-        text: data.answer || 'No response generated.',
+        text: data.answer || (data.error ? `Error: ${data.error}` : 'No response generated.'),
         explainTrace: data.explainabilityTrace,
         graphContext: data.graphContext,
         model: data.model
@@ -84,17 +138,34 @@ export default function AgentChat() {
               <div style={{ fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.35rem', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 {msg.role === 'user' ? 'You' : 'FalkorBrain Agent'}
               </div>
-              <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, fontSize: '0.95rem' }}>{msg.text}</div>
+              {msg.role === 'user' ? (
+                <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, fontSize: '0.95rem' }}>{msg.text}</div>
+              ) : (
+                <FormattedContent text={msg.text} />
+              )}
 
               {/* Explainability Trace Display */}
               {msg.explainTrace && msg.explainTrace.length > 0 && (
-                <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--accent-cyan)', fontWeight: 600, marginBottom: '0.25rem' }}>
+                <div style={{ marginTop: '0.85rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--accent-cyan)', fontWeight: 700, marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Graph Traversal Path (Explainability):
                   </div>
-                  <pre className="code-block" style={{ fontSize: '0.75rem', padding: '0.5rem' }}>
-                    {JSON.stringify(msg.explainTrace, null, 2)}
-                  </pre>
+                  {msg.explainTrace.map((traceItem, tIdx) => (
+                    <div key={tIdx} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.4rem', background: 'rgba(0,0,0,0.4)', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid rgba(6,182,212,0.25)' }}>
+                      {traceItem.pathNodes && traceItem.pathNodes.map((nodeName, nIdx) => (
+                        <React.Fragment key={nIdx}>
+                          <span style={{ background: '#1e293b', color: '#f8fafc', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, border: '1px solid rgba(255,255,255,0.08)' }}>
+                            {nodeName}
+                          </span>
+                          {traceItem.relationships && traceItem.relationships[nIdx] && (
+                            <span style={{ color: 'var(--accent-falkor)', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 600 }}>
+                              {`-[:${traceItem.relationships[nIdx]}]->`}
+                            </span>
+                          )}
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -144,10 +215,10 @@ export default function AgentChat() {
             Click any prompt to trigger multi-hop Cypher traversal in FalkorDB:
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {sampleQueries.map((q, idx) => (
+            {sampleQueries.map((item, idx) => (
               <button
                 key={idx}
-                onClick={() => handleSend(q)}
+                onClick={() => handleSend(item.q)}
                 style={{
                   textAlign: 'left',
                   background: 'var(--bg-secondary)',
@@ -155,15 +226,21 @@ export default function AgentChat() {
                   color: 'var(--text-main)',
                   padding: '0.6rem 0.8rem',
                   borderRadius: '6px',
-                  fontSize: '0.8rem',
+                  fontSize: '0.78rem',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
-                  lineHeight: 1.4
+                  lineHeight: 1.4,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.2rem'
                 }}
                 onMouseOver={(e) => e.currentTarget.style.borderColor = 'var(--accent-falkor)'}
                 onMouseOut={(e) => e.currentTarget.style.borderColor = 'var(--border-color)'}
               >
-                "{q}"
+                <span style={{ fontSize: '0.65rem', color: 'var(--accent-cyan)', fontWeight: 700, textTransform: 'uppercase' }}>
+                  {item.track}
+                </span>
+                <span>"{item.q}"</span>
               </button>
             ))}
           </div>

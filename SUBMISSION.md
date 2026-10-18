@@ -35,3 +35,29 @@ The graph shapes every step the agent takes:
 - **Backend API & Orchestration:** Node.js, Express, @babel/parser, @babel/traverse, falkordb SDK
 - **Frontend Dashboard:** React, Vite, Vanilla CSS design system
 - **Protocols & Standards:** Model Context Protocol (MCP), REST API
+
+---
+
+## Track-by-Track Requirement Satisfaction Matrix
+
+### Track 01: Agents That Act on Connected Data
+- **Multi-Hop Reasoning:** The agent traces `(Decision)-[:AFFECTS]->(File)-[:IMPORTS]->(Importer)` and `(File)-[:DEFINES]->(Symbol)` to uncover multi-hop blast radiuses.
+- **Graph Queries as Agent Tools:** Built parameterized Cypher tools (`executeCypher`, `getDecisionImpactTrace`, `explainConnectionPath`) executed directly in FalkorDB.
+- **Tool Selection through MCP:** Implemented Model Context Protocol endpoints exposing `falkordb_cypher_query`, `falkordb_trace_decision_impact`, `falkordb_explain_connection`, and `falkordb_get_agent_memory`.
+- **Actions Based on Graph Topology:** When a user asks about touching `token.util.js`, the agent warns that ADR-001 enforces userCode immutability on that specific module.
+- **Explainable Results:** Displays visual breadcrumb chip paths (e.g. `[Krish] -[:AUTHORED]-> [ADR-001] -[:AFFECTS]-> [token.util.js]`) showing the exact path traversed in FalkorDB.
+
+### Track 02: Agent Memory and Coordination
+- **Episodic, Semantic, and Procedural Memory:**
+  - Episodic: Retains meeting takeaways (e.g., Session #101 token revocation rules).
+  - Semantic: Preserves enduring best practices (e.g., JWT numerical ID principle).
+  - Procedural: Enforces code review rules (e.g., test regression guidelines).
+- **Shared State & Multi-Agent Handoffs:** Models agent collaboration with `(:Agent)-[:HANDED_OFF_TO {task, status, handoffTime}]->(:Agent)`, persisting coordination state in FalkorDB.
+- **Tenant & User Scoping:** Memories and sessions carry `tenantId` and `userId` attributes for strict tenancy isolation.
+
+### Track 03: Company Brain
+- **Docs, Tickets, and Chats in One Graph:** Connects Jira tickets (`SEC-402`), engineering specs (`DOC-88`), chat sessions (`Session #101`), and ADRs in a single unified graph.
+- **Who Owns What, and Who Knows What:** Explicit relationships `(:User)-[:OWNS]->(:SourceFile)` and `(:User)-[:EXPERT_IN]->(:Concept)`.
+- **Tracing Decisions to Source:** Cypher queries trace any architectural decision directly back to its originating ticket (`-[:RESOLVES_TICKET]->`) and specification (`-[:CITES_DOCUMENT]->`).
+- **Answers with Clear Sources:** Agent responses cite the exact authors, reviewers, ticket IDs, and URLs from the knowledge graph.
+
