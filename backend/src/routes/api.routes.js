@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { askAgent } from '../services/agent.service.js';
 import { executeCypher, getGraphVisualizationData, getDecisionImpactTrace } from '../graph/queries.js';
 import { seedInitialKnowledgeGraph } from '../graph/seeder.js';
+import { ingestCodebase } from '../services/codeIngest.service.js';
 import { MCP_TOOLS, handleMcpToolCall } from '../mcp/falkorMcpServer.js';
 
 const router = Router();
@@ -60,6 +61,20 @@ router.post('/graph/seed', async (req, res) => {
   try {
     await seedInitialKnowledgeGraph();
     res.json({ message: 'FalkorDB graph reseeded successfully.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Ingest Local Codebase into Knowledge Graph
+router.post('/graph/ingest', async (req, res) => {
+  try {
+    const { directoryPath } = req.body;
+    if (!directoryPath) {
+      return res.status(400).json({ error: 'directoryPath is required.' });
+    }
+    const result = await ingestCodebase(directoryPath);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

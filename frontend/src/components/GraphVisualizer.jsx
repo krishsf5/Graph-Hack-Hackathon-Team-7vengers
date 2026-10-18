@@ -15,6 +15,8 @@ export default function GraphVisualizer() {
   const [loading, setLoading] = useState(true);
   const [selectedNode, setSelectedNode] = useState(null);
   const [filterLabel, setFilterLabel] = useState('ALL');
+  const [ingestPath, setIngestPath] = useState('');
+  const [ingesting, setIngesting] = useState(false);
 
   useEffect(() => {
     fetchGraph();
@@ -48,6 +50,29 @@ export default function GraphVisualizer() {
   const filteredEdges = filterLabel === 'ALL'
     ? data
     : data.filter(e => e.source?.label === filterLabel || e.target?.label === filterLabel);
+
+  async function handleIngest() {
+    if (!ingestPath.trim() || ingesting) return;
+    setIngesting(true);
+    try {
+      const res = await fetch('/api/graph/ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ directoryPath: ingestPath.trim() })
+      });
+      const resData = await res.json();
+      if (resData.error) {
+        alert('Ingest error: ' + resData.error);
+      } else {
+        alert(`Ingested ${resData.ingestedFiles} files, ${resData.ingestedSymbols} symbols, and ${resData.ingestedImports} imports into FalkorDB!`);
+        fetchGraph();
+      }
+    } catch (err) {
+      alert('Network error: ' + err.message);
+    } finally {
+      setIngesting(false);
+    }
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: 'calc(100vh - 160px)' }}>
@@ -155,37 +180,74 @@ export default function GraphVisualizer() {
           </div>
         </div>
 
-        {/* Node Inspector Panel */}
-        <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 700, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-            Entity Inspector
-          </h3>
-          {selectedNode ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Label</span>
-                <div style={{ color: NODE_COLORS[selectedNode.label] || '#fff', fontWeight: 700 }}>
-                  {selectedNode.label}
+        {/* Node Inspector Panel & Code Ingest */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+              Entity Inspector
+            </h3>
+            {selectedNode ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Label</span>
+                  <div style={{ color: NODE_COLORS[selectedNode.label] || '#fff', fontWeight: 700 }}>
+                    {selectedNode.label}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Identifier</span>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', color: '#fff' }}>
+                    {selectedNode.id}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Title / Name</span>
+                  <div style={{ fontSize: '0.9rem', color: '#fff' }}>
+                    {selectedNode.title}
+                  </div>
                 </div>
               </div>
-              <div>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Identifier</span>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', color: '#fff' }}>
-                  {selectedNode.id}
-                </div>
-              </div>
-              <div>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Title / Name</span>
-                <div style={{ fontSize: '0.9rem', color: '#fff' }}>
-                  {selectedNode.title}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              Click any node from the canvas to inspect its properties and relationships.
+            ) : (
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                Click any node from the canvas to inspect its properties and relationships.
+              </p>
+            )}
+          </div>
+
+          {/* Ingest Codebase Panel */}
+          <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-falkor)' }}>
+              Ingest Codebase to Graph
+            </h3>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Parse AST imports and symbols into FalkorDB:
             </p>
-          )}
+            <input
+              type="text"
+              placeholder="e.g., d:/dev/ai-agent/Graph Hacks Hackathon/backend/src"
+              value={ingestPath}
+              onChange={(e) => setIngestPath(e.target.value)}
+              style={{
+                width: '100%',
+                background: 'var(--bg-primary)',
+                border: '1px solid var(--border-color)',
+                color: '#fff',
+                padding: '0.5rem',
+                borderRadius: '6px',
+                fontSize: '0.75rem',
+                fontFamily: 'var(--font-mono)',
+                outline: 'none'
+              }}
+            />
+            <button
+              onClick={handleIngest}
+              disabled={ingesting}
+              className="btn-primary"
+              style={{ padding: '0.5rem', fontSize: '0.8rem', justifyContent: 'center' }}
+            >
+              {ingesting ? 'Scanning AST...' : 'Ingest to Graph'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
