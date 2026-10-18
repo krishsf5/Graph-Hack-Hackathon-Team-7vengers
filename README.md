@@ -3,7 +3,10 @@
 
 [![FalkorDB Hackathon](https://img.shields.io/badge/FalkorDB-Hackathon%202026-brightgreen)](https://www.wemakedevs.org/hackathons/falkordb)
 [![Team](https://img.shields.io/badge/Team-7vengers-blue)](https://github.com/krishsf5/Graph-Hack-Hackathon-Team-7vengers)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Online-success?style=for-the-badge&logo=render)](https://falkorbrain.onrender.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+🌐 **Live Demo Application:** [https://falkorbrain.onrender.com](https://falkorbrain.onrender.com)
 
 ---
 
